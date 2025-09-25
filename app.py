@@ -101,6 +101,7 @@ def conclude_one(gid, channel_id, ts, emoji, title, winners_count):
             if r.get("name") == emoji:
                 users = r.get("users", []) or []
                 break
+
         valid = []
         for u in set(users):
             if u == BOT_USER_ID:
@@ -111,24 +112,26 @@ def conclude_one(gid, channel_id, ts, emoji, title, winners_count):
                     valid.append(u)
             except Exception:
                 pass
+
         winners_count = min(max(1, winners_count), len(valid)) if valid else 0
+
         if winners_count == 0:
             app.client.chat_postMessage(
                 channel=channel_id,
                 thread_ts=ts,
                 text=f"⏰ Giveaway ended — *{title}*. No valid entries.",
+                reply_broadcast=True,
             )
         else:
             winners = random.sample(valid, winners_count)
-            link = app.client.chat_getPermalink(channel=channel_id, message_ts=ts)[
-                "permalink"
-            ]
             mentions = " ".join(f"<@{u}>" for u in winners)
             app.client.chat_postMessage(
                 channel=channel_id,
                 thread_ts=ts,
-                text=f"🎉 Giveaway ended — *{title}*\nWinners ({winners_count}/{len(valid)}): {mentions}\n{link}",
+                text=f"🎉 Giveaway ended — *{title}*\nWinners ({winners_count}/{len(valid)}): {mentions}",
+                reply_broadcast=True,
             )
+
         db_execute(
             "UPDATE giveaways SET status='closed', updated_at=NOW() WHERE id=%s", (gid,)
         )
@@ -138,6 +141,7 @@ def conclude_one(gid, channel_id, ts, emoji, title, winners_count):
                 channel=channel_id,
                 thread_ts=ts,
                 text=f"⚠️ Could not finish giveaway.\n`{e}`",
+                reply_broadcast=True,
             )
         except Exception:
             pass
