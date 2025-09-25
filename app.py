@@ -63,6 +63,16 @@ def db_query(q, args=()):
     return rows
 
 
+def slack_abs(epoch: int) -> str:
+    # e.g., "Sep 25 at 2:24 PM" (auto-localized per viewer)
+    return f"<!date^{epoch}^{{date_short_pretty}} at {{time}}|{datetime.fromtimestamp(epoch, LOCAL_TZ).strftime('%b %d at %I:%M %p')}>"
+
+
+def slack_rel(epoch: int) -> str:
+    # e.g., "in 4 minutes" (auto-updating)
+    return f"<!date^{epoch}^{{relative}}|in {(max(0, epoch - int(time.time())) // 60)} min>"
+
+
 def parse_duration(s):
     s = (s or "").strip().lower()
     total = 0
@@ -278,7 +288,7 @@ def create_and_post(client, user_id, channel_id, title, seconds, emoji, winners)
     instructions = f"React with :{emoji}: to enter. Entries close automatically. Winners: {winners}"
     res = client.chat_postMessage(
         channel=channel_id,
-        text=f"{header}\nEnds {slack_date(end_ts)}\n{instructions}",
+        text=f"{header}\nEnds {datetime.fromtimestamp(end_ts, LOCAL_TZ)}\n{instructions}",  # simple fallback for notifications
         blocks=[
             {"type": "section", "text": {"type": "mrkdwn", "text": header}},
             {
@@ -286,13 +296,14 @@ def create_and_post(client, user_id, channel_id, title, seconds, emoji, winners)
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"Ends {slack_date(end_ts)} • Winners: *{winners}*",
+                        "text": f"Ends {slack_abs(end_ts)} • {slack_rel(end_ts)} • Winners: *{winners}*",
                     }
                 ],
             },
             {"type": "section", "text": {"type": "mrkdwn", "text": instructions}},
         ],
     )
+
     ts = res["ts"]
     try:
         client.reactions_add(channel=channel_id, timestamp=ts, name=emoji)
